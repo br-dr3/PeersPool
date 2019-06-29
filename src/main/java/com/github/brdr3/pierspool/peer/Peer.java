@@ -13,10 +13,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class Peer {
 
     private final Gson gson = new Gson();
-    private Thread receiver;
-    private Thread sender;
-    private Thread dataGetter;
-    private File folder;
+    private final Thread receiver;
+    private final Thread sender;
+    private final Thread dataGetter;
+    private final File folder;
     private HashMap<String, File> fileStatus;
     private final int port;
     private final InetAddress address;
@@ -99,18 +99,26 @@ public class Peer {
     }
     
     public void getDataStatus() {
-        boolean newVersion = false;
-        HashMap<String, File> auxiliarFileStatus = new HashMap<>();
-        
-        for(File f: this.folder.listFiles()) {
-            newVersion = f.isFile() && !fileStatus.containsValue(f);
-            auxiliarFileStatus.put(f.getName(), f);
-        }
-        
-        fileStatus = auxiliarFileStatus;
-        
-        if(newVersion) {
-            version++;
+        while (true) {
+            boolean newVersion = false;
+            HashMap<String, File> auxiliarFileStatus = new HashMap<>();
+
+            for(File f: this.folder.listFiles()) {
+                newVersion = f.isFile() && !fileStatus.containsValue(f);
+                auxiliarFileStatus.put(f.getName(), f);
+            }
+
+            fileStatus = auxiliarFileStatus;
+
+            if(newVersion) {
+                version++;
+            }
+            
+            try {
+                Thread.sleep(1000);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
     }
     
