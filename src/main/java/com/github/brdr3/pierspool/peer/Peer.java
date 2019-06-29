@@ -2,6 +2,8 @@ package com.github.brdr3.pierspool.peer;
 
 import com.github.brdr3.pierspool.util.Message;
 import com.github.brdr3.pierspool.util.Message.MessageBuilder;
+import com.github.brdr3.pierspool.util.Tuple;
+import com.github.brdr3.pierspool.util.User;
 import com.github.brdr3.pierspool.util.Utils;
 import com.github.brdr3.pierspool.util.constants.Constants;
 import com.google.gson.Gson;
@@ -12,35 +14,31 @@ import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class Peer {
 
     private final Gson gson = new Gson();
+
     private final Thread receiver;
     private final Thread sender;
     private final Thread dataGetter;
     private final Thread gossipTime;
+    private final Thread processor;
+
     private final File folder;
-    private HashMap<String, File> fileStatus;
     private final int id;
     private final int port;
     private final InetAddress address;
     private final ConcurrentLinkedQueue<Message> processQueue;
     private final ConcurrentLinkedQueue<Message> sendQueue;
     private Long version = (long) 0;
+    
+    private volatile HashMap<String, File> fileStatus;
+    private volatile HashMap<User, Tuple<HashMap<String, File>, Long>> peersStatus;
 
     public Peer(int id, String address, int port, String path) throws Exception {
-        
+
         this.id = id;
-        
-        gossipTime = new Thread() {
-            @Override
-            public void run() {
-                gossip();
-            }
-        };
 
         receiver = new Thread() {
             @Override
@@ -60,6 +58,20 @@ public class Peer {
             @Override
             public void run() {
                 getDataStatus();
+            }
+        };
+
+        gossipTime = new Thread() {
+            @Override
+            public void run() {
+                gossip();
+            }
+        };
+
+        processor = new Thread() {
+            @Override
+            public void run() {
+                process();
             }
         };
 
@@ -160,31 +172,61 @@ public class Peer {
     public void gossip() {
         while (true) {
             MessageBuilder messageBuilder = new MessageBuilder();
-            
+
             Random r = new Random();
             int pair;
-            
+
             do {
                 pair = r.nextInt(Constants.users.length);
-            } while(pair == this.id); 
-            
+            } while (pair == this.id);
+
             Message m;
             synchronized (fileStatus) {
                 m = messageBuilder.content(fileStatus)
-                                  .id(version)
-                                  .from(Constants.users[id])
-                                  .to(Constants.users[pair])
-                                  .build();
-                                
+                        .id(version)
+                        .from(Constants.users[id])
+                        .to(Constants.users[pair])
+                        .build();
             }
-            
+
             sendQueue.add(m);
-            
+
             try {
                 Thread.sleep(1000);
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
+        }
+    }
+    
+    public void process() {
+        while (true) {
+            Message m = processQueue.poll();
+            try {
+                processMessage(m);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+    
+    public void processMessage(Message m) {
+        Long peerStatusVersion = m.getId();
+        HashMap<String, File> peerStatus = (HashMap<String, File>) m.getContent();
+        
+        if(peersStatus.containsKey(m.getFrom())) {
+            Long maxPeerStatusVersion = peersStatus.get(m.getFrom()).getY();
+            if(maxPeerStatusVersion < peerStatusVersion) {
+                System.out.println("New entry to peer " + m.getFrom() + "!");
+                peersStatus.put(m.getFrom(), 
+                                new Tuple<>(peerStatus, peerStatusVersion));
+            } else {
+                System.out.println("This entry is old to peer " + m.getFrom() + "!");
+            }
+        } else {
+            System.out.println("First peer entry. Peer: " + m.getFrom() + ".");
+            peersStatus.put(m.getFrom(), 
+                            new Tuple<>(peerStatus, peerStatusVersion));
         }
     }
 }
