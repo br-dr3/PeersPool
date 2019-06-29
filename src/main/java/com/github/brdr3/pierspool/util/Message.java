@@ -36,4 +36,37 @@ public class Message {
     public void setTo(User to) {
         this.to = to;
     }
+    
+    public static class MessageBuilder {
+         
+        Message m;
+        
+        public MessageBuilder() {
+            m = new Message();
+        }
+        
+        public MessageBuilder id(Long id) {
+            m.setId(id);
+            return this;
+        }
+        
+        public MessageBuilder to(User to) {
+            m.setTo(to);
+            return this;
+        }
+        
+        public MessageBuilder from(User from) {
+            m.setFrom(from);
+            return this;
+        }
+        
+        public MessageBuilder content(Object content) {
+            m.setContent(content);
+            return this;
+        }
+        
+        public Message build() {
+            return m;
+        }
+    }
 }
