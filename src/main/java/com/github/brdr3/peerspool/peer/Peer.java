@@ -1,11 +1,11 @@
-package com.github.brdr3.pierspool.peer;
+package com.github.brdr3.peerspool.peer;
 
-import com.github.brdr3.pierspool.util.Message;
-import com.github.brdr3.pierspool.util.Message.MessageBuilder;
-import com.github.brdr3.pierspool.util.Tuple;
-import com.github.brdr3.pierspool.util.User;
-import com.github.brdr3.pierspool.util.Utils;
-import com.github.brdr3.pierspool.util.constants.Constants;
+import com.github.brdr3.peerspool.util.Message;
+import com.github.brdr3.peerspool.util.Message.MessageBuilder;
+import com.github.brdr3.peerspool.util.Tuple;
+import com.github.brdr3.peerspool.util.User;
+import com.github.brdr3.peerspool.util.Utils;
+import com.github.brdr3.peerspool.util.constants.Constants;
 import com.google.gson.Gson;
 import java.io.File;
 import java.net.DatagramPacket;

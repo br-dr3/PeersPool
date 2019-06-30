@@ -1,4 +1,4 @@
-package com.github.brdr3.pierspool.util;
+package com.github.brdr3.peerspool.util;
 
 import java.net.InetAddress;
 import java.util.Objects;

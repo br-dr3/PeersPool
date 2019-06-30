@@ -1,6 +1,6 @@
-package com.github.brdr3.pierspool.util.constants;
+package com.github.brdr3.peerspool.util.constants;
 
-import com.github.brdr3.pierspool.util.User;
+import com.github.brdr3.peerspool.util.User;
 
 public class Constants {
     public static final String address[] = {"localhost", "localhost", "localhost", "localhost", "localhost"};

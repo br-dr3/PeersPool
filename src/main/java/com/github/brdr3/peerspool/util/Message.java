@@ -1,4 +1,4 @@
-package com.github.brdr3.pierspool.util;
+package com.github.brdr3.peerspool.util;
 public class Message {
     private Long id;
     private Object content;

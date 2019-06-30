@@ -1,7 +1,7 @@
-package com.github.brdr3.pierspool.main;
+package com.github.brdr3.peerspool.main;
 
-import com.github.brdr3.pierspool.peer.Peer;
-import com.github.brdr3.pierspool.util.constants.Constants;
+import com.github.brdr3.peerspool.peer.Peer;
+import com.github.brdr3.peerspool.util.constants.Constants;
 
 public class Main {
     public static void main(String[] args) {

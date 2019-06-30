@@ -1,4 +1,4 @@
-package com.github.brdr3.pierspool.util;
+package com.github.brdr3.peerspool.util;
 
 public class Tuple<T, T0> {
     T x;

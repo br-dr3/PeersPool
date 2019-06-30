@@ -1,4 +1,4 @@
-package com.github.brdr3.pierspool.util;
+package com.github.brdr3.peerspool.util;
 public class Utils {
     
     public static void cleanBuffer(byte[] buffer) {
