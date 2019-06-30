@@ -12,6 +12,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.HashMap;
+import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -24,6 +26,7 @@ public class Peer {
     private final Thread dataGetter;
     private final Thread gossipTime;
     private final Thread processor;
+    private final Thread confessor;
 
     private final File folder;
     private final int id;
@@ -32,7 +35,7 @@ public class Peer {
     private final ConcurrentLinkedQueue<Message> processQueue;
     private final ConcurrentLinkedQueue<Message> sendQueue;
     private Long version = (long) 0;
-    
+
     private volatile HashMap<String, File> fileStatus;
     private volatile HashMap<User, Tuple<HashMap<String, File>, Long>> peersStatus;
 
@@ -75,6 +78,13 @@ public class Peer {
             }
         };
 
+        confessor = new Thread() {
+            @Override
+            public void run() {
+                confess();
+            }
+        };
+
         this.address = InetAddress.getLocalHost();
         this.port = port;
 
@@ -90,6 +100,8 @@ public class Peer {
         sender.start();
         gossipTime.start();
         dataGetter.start();
+        processor.start();
+        confessor.start();
     }
 
     public void receive() {
@@ -175,14 +187,38 @@ public class Peer {
 
             Random r = new Random();
             int pair;
+            User gossiped;
+            Entry<User, Tuple<HashMap<String, File>, Long>> gossip;
 
             do {
                 pair = r.nextInt(Constants.users.length);
             } while (pair == this.id);
 
+            if (peersStatus.isEmpty()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+
+                continue;
+            } else {
+                Object users[] = peersStatus.values().toArray();
+                gossiped = (User) users[r.nextInt(users.length)];
+
+                // Functional Programming
+                // Pick the map entry that has the user that I want to gossip.
+                // In another words, pick what I want to gossip.
+                gossip = peersStatus.entrySet()
+                        .stream()
+                        .filter(e -> e.getKey().equals(gossiped))
+                        .findFirst().get();
+            }
+
             Message m;
-            synchronized (fileStatus) {
-                m = messageBuilder.content(fileStatus)
+            synchronized (peersStatus) {
+                m = messageBuilder
+                        .content(gossip)
                         .id(version)
                         .from(Constants.users[id])
                         .to(Constants.users[pair])
@@ -198,7 +234,7 @@ public class Peer {
             }
         }
     }
-    
+
     public void process() {
         while (true) {
             Message m = processQueue.poll();
@@ -209,24 +245,88 @@ public class Peer {
             }
         }
     }
-    
+
     public void processMessage(Message m) {
-        Long peerStatusVersion = m.getId();
-        HashMap<String, File> peerStatus = (HashMap<String, File>) m.getContent();
-        
-        if(peersStatus.containsKey(m.getFrom())) {
+        Entry<User, Tuple<HashMap<String, File>, Long>> peerStatus
+                = (Entry<User, Tuple<HashMap<String, File>, Long>>) m.getContent();
+
+        Long peerStatusVersion = peerStatus.getValue().getY();
+
+        if (peersStatus.containsKey(peerStatus.getKey())) {
             Long maxPeerStatusVersion = peersStatus.get(m.getFrom()).getY();
-            if(maxPeerStatusVersion < peerStatusVersion) {
+            if (maxPeerStatusVersion < peerStatusVersion) {
                 System.out.println("New entry to peer " + m.getFrom() + "!");
-                peersStatus.put(m.getFrom(), 
-                                new Tuple<>(peerStatus, peerStatusVersion));
+                peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
+            } else if (maxPeerStatusVersion.equals(peerStatusVersion)) {
+                System.out.println("This entry is duplicated to peer " + m.getFrom() + "!");
             } else {
                 System.out.println("This entry is old to peer " + m.getFrom() + "!");
             }
         } else {
             System.out.println("First peer entry. Peer: " + m.getFrom() + ".");
-            peersStatus.put(m.getFrom(), 
-                            new Tuple<>(peerStatus, peerStatusVersion));
+            peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
         }
+    }
+
+    public void confess() {
+        while (true) {
+            MessageBuilder messageBuilder = new MessageBuilder();
+            int pair;
+            Entry<User, Tuple<HashMap<String, File>, Long>> gossip;
+            Message m;
+
+            do {
+                pair = new Random().nextInt(Constants.users.length);
+            } while (pair == this.id);
+
+            synchronized (fileStatus) {
+                gossip = new FileStatusEntry<>(Constants.users[this.id],
+                        new Tuple<>(fileStatus, version));
+
+                m = messageBuilder
+                        .content(gossip)
+                        .id(version)
+                        .from(Constants.users[id])
+                        .to(Constants.users[pair])
+                        .build();
+            }
+
+            sendQueue.add(m);
+
+            try {
+                Thread.sleep(1000);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    private final class FileStatusEntry<K, V> implements Entry<K, V> {
+
+        private final K key;
+        private V value;
+
+        private FileStatusEntry(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        @Override
+        public K getKey() {
+            return key;
+        }
+
+        @Override
+        public V getValue() {
+            return value;
+        }
+
+        @Override
+        public V setValue(V value) {
+            V old = this.value;
+            this.value = value;
+            return old;
+        }
+
     }
 }
