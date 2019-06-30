@@ -80,16 +80,16 @@ public class Peer {
                 confess();
             }
         };
-        
+
         this.id = id;
-        
+
         try {
             this.address = InetAddress.getLocalHost();
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new RuntimeException("Could not create Peer. Address error.");
         }
-        
+
         this.port = port;
         this.processQueue = new ConcurrentLinkedQueue<>();
         this.sendQueue = new ConcurrentLinkedQueue<>();
@@ -99,11 +99,11 @@ public class Peer {
 
     public void start() {
         dataGetter.start();
-        receiver.start();
-        sender.start();
-        gossipTime.start();
-        processor.start();
-        confessor.start();
+//        receiver.start();
+//        sender.start();
+//        gossipTime.start();
+//        processor.start();
+//        confessor.start();
     }
 
     public void receive() {
@@ -147,17 +147,25 @@ public class Peer {
             boolean newVersion = false;
             HashMap<String, File> auxiliarFileStatus = new HashMap<>();
 
+            System.out.println("dataGetter: Retrieving data from folder " + folder.getAbsolutePath());
             for (File f : this.folder.listFiles()) {
-                newVersion = f.isFile() && !fileStatus.containsValue(f);
+                newVersion |=  f.isFile() && !fileStatus.containsValue(f);
                 auxiliarFileStatus.put(f.getName(), f);
             }
+            
+            for(File f: this.fileStatus.values()) {
+                newVersion |= !auxiliarFileStatus.containsValue(f);
+            }
+
+            System.out.println("dataGetter: Data retrieved.");
 
             synchronized (fileStatus) {
                 fileStatus = auxiliarFileStatus;
-            }
-
-            if (newVersion) {
-                version++;
+                if (newVersion) {
+                    System.out.println("New version of files.");
+                    System.out.println("fileStatus = " + fileStatus);
+                    version++;
+                }
             }
 
             try {
@@ -195,7 +203,7 @@ public class Peer {
             do {
                 pair = r.nextInt(Constants.users.length);
             } while (pair == this.id);
-            
+
             synchronized (peersStatus) {
                 if (peersStatus.isEmpty()) {
                     try {
@@ -219,11 +227,11 @@ public class Peer {
 
             Message m;
             m = messageBuilder
-                        .content(gossip)
-                        .id(version)
-                        .from(Constants.users[id])
-                        .to(Constants.users[pair])
-                        .build();
+                    .content(gossip)
+                    .id(version)
+                    .from(Constants.users[id])
+                    .to(Constants.users[pair])
+                    .build();
 
             sendQueue.add(m);
 
@@ -249,11 +257,11 @@ public class Peer {
     public void processMessage(Message m) {
         Entry<User, Tuple<HashMap<String, File>, Long>> peerStatus
                 = (Entry<User, Tuple<HashMap<String, File>, Long>>) m.getContent();
-        
+
         User gossiped = peerStatus.getKey();
         Tuple<HashMap<String, File>, Long> gossip = peerStatus.getValue();
         Long peerStatusVersion = gossip.getY();
-        
+
         synchronized (peersStatus) {
             if (peersStatus.containsKey(gossiped)) {
                 Long maxPeerStatusVersion = peersStatus.get(gossiped).getY();
@@ -287,13 +295,13 @@ public class Peer {
                 confess = new FileStatusEntry<>(Constants.users[id],
                         new Tuple<>(fileStatus, version));
             }
-            
+
             m = messageBuilder
-                        .content(confess)
-                        .id(version)
-                        .from(Constants.users[id])
-                        .to(Constants.users[pair])
-                        .build();
+                    .content(confess)
+                    .id(version)
+                    .from(Constants.users[id])
+                    .to(Constants.users[pair])
+                    .build();
 
             sendQueue.add(m);
 
