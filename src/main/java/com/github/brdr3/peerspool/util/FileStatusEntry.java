@@ -1,8 +1,8 @@
 package com.github.brdr3.peerspool.util;
 
-import java.util.Map;
+import java.util.Map.Entry;
 
-public final class FileStatusEntry<K, V> implements Map.Entry<K, V> {
+public final class FileStatusEntry<K, V> implements Entry<K, V> {
 
         private final K key;
         private V value;

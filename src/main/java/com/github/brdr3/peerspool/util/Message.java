@@ -1,5 +1,6 @@
 package com.github.brdr3.peerspool.util;
 
+import com.google.gson.Gson;
 import java.io.File;
 import java.util.HashMap;
 
@@ -39,6 +40,12 @@ public class Message {
 
     public void setTo(User to) {
         this.to = to;
+    }
+    
+    @Override
+    public String toString() {
+        Gson gson = new Gson();
+        return gson.toJson(this);
     }
     
     public static class MessageBuilder {
