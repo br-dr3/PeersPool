@@ -38,7 +38,7 @@ public class Peer {
     private volatile HashMap<String, File> fileStatus;
     private volatile HashMap<User, Tuple<HashMap<String, File>, Long>> peersStatus;
 
-    public Peer(int id, String address, int port, String path) throws Exception {
+    public Peer(int id, String address, int port, String path) {
         receiver = new Thread() {
             @Override
             public void run() {
@@ -82,7 +82,14 @@ public class Peer {
         };
         
         this.id = id;
-        this.address = InetAddress.getLocalHost();
+        
+        try {
+            this.address = InetAddress.getLocalHost();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new RuntimeException("Could not create Peer. Address error.");
+        }
+        
         this.port = port;
         this.processQueue = new ConcurrentLinkedQueue<>();
         this.sendQueue = new ConcurrentLinkedQueue<>();
@@ -91,10 +98,10 @@ public class Peer {
     }
 
     public void start() {
+        dataGetter.start();
         receiver.start();
         sender.start();
         gossipTime.start();
-        dataGetter.start();
         processor.start();
         confessor.start();
     }
@@ -242,15 +249,17 @@ public class Peer {
     public void processMessage(Message m) {
         Entry<User, Tuple<HashMap<String, File>, Long>> peerStatus
                 = (Entry<User, Tuple<HashMap<String, File>, Long>>) m.getContent();
-
-        Long peerStatusVersion = peerStatus.getValue().getY();
+        
+        User gossiped = peerStatus.getKey();
+        Tuple<HashMap<String, File>, Long> gossip = peerStatus.getValue();
+        Long peerStatusVersion = gossip.getY();
         
         synchronized (peersStatus) {
-            if (peersStatus.containsKey(peerStatus.getKey())) {
-                Long maxPeerStatusVersion = peersStatus.get(m.getFrom()).getY();
+            if (peersStatus.containsKey(gossiped)) {
+                Long maxPeerStatusVersion = peersStatus.get(gossiped).getY();
                 if (maxPeerStatusVersion < peerStatusVersion) {
-                    System.out.println("New entry to peer " + m.getFrom() + "!");
-                    peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
+                    System.out.println("New entry to peer " + gossiped + "!");
+                    peersStatus.put(gossiped, gossip);
                 } else if (maxPeerStatusVersion.equals(peerStatusVersion)) {
                     System.out.println("This entry is duplicated to peer " + m.getFrom() + "!");
                 } else {
@@ -258,7 +267,7 @@ public class Peer {
                 }
             } else {
                 System.out.println("First peer entry. Peer: " + m.getFrom() + ".");
-                peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
+                peersStatus.put(gossiped, gossip);
             }
         }
     }
@@ -267,7 +276,7 @@ public class Peer {
         while (true) {
             MessageBuilder messageBuilder = new MessageBuilder();
             int pair;
-            Entry<User, Tuple<HashMap<String, File>, Long>> gossip;
+            Entry<User, Tuple<HashMap<String, File>, Long>> confess;
             Message m;
 
             do {
@@ -275,16 +284,16 @@ public class Peer {
             } while (pair == this.id);
 
             synchronized (fileStatus) {
-                gossip = new FileStatusEntry<>(Constants.users[this.id],
+                confess = new FileStatusEntry<>(Constants.users[id],
                         new Tuple<>(fileStatus, version));
-
-                m = messageBuilder
-                        .content(gossip)
+            }
+            
+            m = messageBuilder
+                        .content(confess)
                         .id(version)
                         .from(Constants.users[id])
                         .to(Constants.users[pair])
                         .build();
-            }
 
             sendQueue.add(m);
 
@@ -322,6 +331,5 @@ public class Peer {
             this.value = value;
             return old;
         }
-
     }
 }
