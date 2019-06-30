@@ -205,7 +205,7 @@ public class Peer {
                     }
                     continue;
                 } else {
-                    Object users[] = peersStatus.values().toArray();
+                    Object users[] = peersStatus.keySet().toArray();
                     gossiped = (User) users[r.nextInt(users.length)];
                     // Functional Programming
                     // Pick the map entry that has the user that I want to gossip.
