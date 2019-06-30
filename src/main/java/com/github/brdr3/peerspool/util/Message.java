@@ -1,7 +1,11 @@
 package com.github.brdr3.peerspool.util;
+
+import java.io.File;
+import java.util.HashMap;
+
 public class Message {
     private Long id;
-    private Object content;
+    private FileStatusEntry<User, Tuple<HashMap<String, File>, Long>> content;
     private User from;
     private User to;
     
@@ -17,7 +21,7 @@ public class Message {
         return content;
     }
 
-    public void setContent(Object content) {
+    public void setContent(FileStatusEntry<User, Tuple<HashMap<String, File>, Long>> content) {
         this.content = content;
     }
 
@@ -60,7 +64,7 @@ public class Message {
             return this;
         }
         
-        public MessageBuilder content(Object content) {
+        public MessageBuilder content(FileStatusEntry<User, Tuple<HashMap<String, File>, Long>> content) {
             m.setContent(content);
             return this;
         }

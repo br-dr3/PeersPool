@@ -1,6 +1,7 @@
 package com.github.brdr3.peerspool.peer;
 
 import com.github.brdr3.peerspool.util.Message;
+import com.github.brdr3.peerspool.util.FileStatusEntry;
 import com.github.brdr3.peerspool.util.Message.MessageBuilder;
 import com.github.brdr3.peerspool.util.Tuple;
 import com.github.brdr3.peerspool.util.User;
@@ -12,7 +13,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.HashMap;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -49,14 +49,14 @@ public class Peer {
         sender = new Thread() {
             @Override
             public void run() {
-                send();
+                send(false);
             }
         };
 
         dataGetter = new Thread() {
             @Override
             public void run() {
-                getDataStatus();
+                getDataStatus(true);
             }
         };
 
@@ -95,18 +95,23 @@ public class Peer {
         this.sendQueue = new ConcurrentLinkedQueue<>();
         this.folder = new File(path);
         this.fileStatus = new HashMap<>();
+        this.peersStatus = new HashMap<>();
     }
 
     public void start() {
         dataGetter.start();
-//        receiver.start();
-//        sender.start();
-//        gossipTime.start();
-//        processor.start();
-//        confessor.start();
+        receiver.start();
+        sender.start();
+        gossipTime.start();
+        processor.start();
+        confessor.start();
     }
-
+    
     public void receive() {
+        receive(false);
+    }
+    
+    public void receive(boolean silent) {
         DatagramSocket socket;
         DatagramPacket packet;
         String jsonMessage;
@@ -119,9 +124,14 @@ public class Peer {
                 packet = new DatagramPacket(buffer, buffer.length, this.address, this.port);
 
                 socket.receive(packet);
-
+                
                 jsonMessage = new String(packet.getData()).trim();
                 message = gson.fromJson(jsonMessage, Message.class);
+                
+                if(!silent) {
+                    System.out.println("receiver > Message received from " + message.getFrom());
+                }
+                
                 processQueue.add(message);
 
                 Utils.cleanBuffer(buffer);
@@ -130,12 +140,22 @@ public class Peer {
             ex.printStackTrace();
         }
     }
-
+    
     public void send() {
+        send(false);
+    }
+    
+    public void send(boolean silent) {
         while (true) {
             Message m = sendQueue.poll();
             try {
-                sendMessage(m);
+                if(m != null) {
+                    sendMessage(m);
+                    if(!silent) {
+                        System.out.println("sender > Message sent to " + m.getTo());
+                    }
+                }
+                Thread.sleep(1000);
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -143,11 +163,18 @@ public class Peer {
     }
 
     public void getDataStatus() {
+        getDataStatus(false);
+    }
+    
+    public void getDataStatus(boolean silent) {
         while (true) {
             boolean newVersion = false;
             HashMap<String, File> auxiliarFileStatus = new HashMap<>();
 
-            System.out.println("dataGetter: Retrieving data from folder " + folder.getAbsolutePath());
+            if(!silent) {
+                System.out.println("dataGetter > Retrieving data from folder " + folder.getAbsolutePath());
+            }
+            
             for (File f : this.folder.listFiles()) {
                 newVersion |=  f.isFile() && !fileStatus.containsValue(f);
                 auxiliarFileStatus.put(f.getName(), f);
@@ -157,13 +184,16 @@ public class Peer {
                 newVersion |= !auxiliarFileStatus.containsValue(f);
             }
 
-            System.out.println("dataGetter: Data retrieved.");
+            if(!silent)
+                System.out.println("dataGetter > Data retrieved.");
 
             synchronized (fileStatus) {
                 fileStatus = auxiliarFileStatus;
                 if (newVersion) {
-                    System.out.println("New version of files.");
-                    System.out.println("fileStatus = " + fileStatus);
+                    if(!silent) {
+                        System.out.println("dataGetter > New version of files.");
+                        System.out.println("dataGetter > fileStatus = " + fileStatus);
+                    }
                     version++;
                 }
             }
@@ -190,15 +220,19 @@ public class Peer {
         socket.send(packet);
         socket.close();
     }
-
-    public void gossip() {
+    
+    public void gossip(){
+        gossip(false);
+    }
+    
+    public void gossip(boolean silent) {
         while (true) {
             MessageBuilder messageBuilder = new MessageBuilder();
 
             Random r = new Random();
             int pair;
             User gossiped;
-            Entry<User, Tuple<HashMap<String, File>, Long>> gossip;
+            FileStatusEntry<User, Tuple<HashMap<String, File>, Long>> gossip;
 
             do {
                 pair = r.nextInt(Constants.users.length);
@@ -218,7 +252,8 @@ public class Peer {
                     // Functional Programming
                     // Pick the map entry that has the user that I want to gossip.
                     // In another words, pick what I want to gossip.
-                    gossip = peersStatus.entrySet()
+                    gossip = (FileStatusEntry<User, Tuple<HashMap<String, File>, Long>>)
+                        peersStatus.entrySet()
                             .stream()
                             .filter(e -> e.getKey().equals(gossiped))
                             .findFirst().get();
@@ -242,21 +277,27 @@ public class Peer {
             }
         }
     }
-
+    
     public void process() {
+        process(false);
+    }
+    
+    public void process(boolean silent) {
         while (true) {
             Message m = processQueue.poll();
             try {
-                processMessage(m);
+                if(m != null) {
+                    processMessage(m, silent);
+                }
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
         }
     }
 
-    public void processMessage(Message m) {
-        Entry<User, Tuple<HashMap<String, File>, Long>> peerStatus
-                = (Entry<User, Tuple<HashMap<String, File>, Long>>) m.getContent();
+    public void processMessage(Message m, boolean silent) {
+        FileStatusEntry<User, Tuple<HashMap<String, File>, Long>> peerStatus = 
+            (FileStatusEntry<User, Tuple<HashMap<String, File>, Long>>) m.getContent();
 
         User gossiped = peerStatus.getKey();
         Tuple<HashMap<String, File>, Long> gossip = peerStatus.getValue();
@@ -266,25 +307,33 @@ public class Peer {
             if (peersStatus.containsKey(gossiped)) {
                 Long maxPeerStatusVersion = peersStatus.get(gossiped).getY();
                 if (maxPeerStatusVersion < peerStatusVersion) {
-                    System.out.println("New entry to peer " + gossiped + "!");
+                    if(!silent)
+                        System.out.println("processor > New entry to peer " + gossiped + "!");
                     peersStatus.put(gossiped, gossip);
                 } else if (maxPeerStatusVersion.equals(peerStatusVersion)) {
-                    System.out.println("This entry is duplicated to peer " + m.getFrom() + "!");
+                    if(!silent)
+                        System.out.println("processor > This entry is duplicated to peer " + m.getFrom() + "!");
                 } else {
-                    System.out.println("This entry is old to peer " + m.getFrom() + "!");
+                    if(!silent)
+                        System.out.println("processor > This entry is old to peer " + m.getFrom() + "!");
                 }
             } else {
-                System.out.println("First peer entry. Peer: " + m.getFrom() + ".");
+                if(!silent)
+                    System.out.println("processor > First peer entry. Peer: " + m.getFrom() + ".");
                 peersStatus.put(gossiped, gossip);
             }
         }
     }
 
     public void confess() {
+        confess(false);
+    }
+    
+    public void confess(boolean silent) {
         while (true) {
             MessageBuilder messageBuilder = new MessageBuilder();
             int pair;
-            Entry<User, Tuple<HashMap<String, File>, Long>> confess;
+            FileStatusEntry<User, Tuple<HashMap<String, File>, Long>> confess;
             Message m;
 
             do {
@@ -310,34 +359,6 @@ public class Peer {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
-        }
-    }
-
-    private final class FileStatusEntry<K, V> implements Entry<K, V> {
-
-        private final K key;
-        private V value;
-
-        private FileStatusEntry(K key, V value) {
-            this.key = key;
-            this.value = value;
-        }
-
-        @Override
-        public K getKey() {
-            return key;
-        }
-
-        @Override
-        public V getValue() {
-            return value;
-        }
-
-        @Override
-        public V setValue(V value) {
-            V old = this.value;
-            this.value = value;
-            return old;
         }
     }
 }

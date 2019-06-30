@@ -52,4 +52,30 @@ public class User {
         hash = 71 * hash + Objects.hashCode(this.port);
         return hash;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final User other = (User) obj;
+        if (this.id != other.id) {
+            return false;
+        }
+        if (this.port != other.port) {
+            return false;
+        }
+        return Objects.equals(this.address, other.address);
+    }
+    
+    @Override
+    public String toString() {
+        return "P"+this.id+"@"+this.address.getHostName()+":"+this.port;
+    }
 }
