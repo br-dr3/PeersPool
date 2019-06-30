@@ -13,7 +13,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -40,9 +39,6 @@ public class Peer {
     private volatile HashMap<User, Tuple<HashMap<String, File>, Long>> peersStatus;
 
     public Peer(int id, String address, int port, String path) throws Exception {
-
-        this.id = id;
-
         receiver = new Thread() {
             @Override
             public void run() {
@@ -84,14 +80,13 @@ public class Peer {
                 confess();
             }
         };
-
+        
+        this.id = id;
         this.address = InetAddress.getLocalHost();
         this.port = port;
-
         this.processQueue = new ConcurrentLinkedQueue<>();
         this.sendQueue = new ConcurrentLinkedQueue<>();
         this.folder = new File(path);
-
         this.fileStatus = new HashMap<>();
     }
 
@@ -193,37 +188,35 @@ public class Peer {
             do {
                 pair = r.nextInt(Constants.users.length);
             } while (pair == this.id);
-
-            if (peersStatus.isEmpty()) {
-                try {
-                    Thread.sleep(1000);
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+            
+            synchronized (peersStatus) {
+                if (peersStatus.isEmpty()) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                    continue;
+                } else {
+                    Object users[] = peersStatus.values().toArray();
+                    gossiped = (User) users[r.nextInt(users.length)];
+                    // Functional Programming
+                    // Pick the map entry that has the user that I want to gossip.
+                    // In another words, pick what I want to gossip.
+                    gossip = peersStatus.entrySet()
+                            .stream()
+                            .filter(e -> e.getKey().equals(gossiped))
+                            .findFirst().get();
                 }
-
-                continue;
-            } else {
-                Object users[] = peersStatus.values().toArray();
-                gossiped = (User) users[r.nextInt(users.length)];
-
-                // Functional Programming
-                // Pick the map entry that has the user that I want to gossip.
-                // In another words, pick what I want to gossip.
-                gossip = peersStatus.entrySet()
-                        .stream()
-                        .filter(e -> e.getKey().equals(gossiped))
-                        .findFirst().get();
             }
 
             Message m;
-            synchronized (peersStatus) {
-                m = messageBuilder
+            m = messageBuilder
                         .content(gossip)
                         .id(version)
                         .from(Constants.users[id])
                         .to(Constants.users[pair])
                         .build();
-            }
 
             sendQueue.add(m);
 
@@ -251,20 +244,22 @@ public class Peer {
                 = (Entry<User, Tuple<HashMap<String, File>, Long>>) m.getContent();
 
         Long peerStatusVersion = peerStatus.getValue().getY();
-
-        if (peersStatus.containsKey(peerStatus.getKey())) {
-            Long maxPeerStatusVersion = peersStatus.get(m.getFrom()).getY();
-            if (maxPeerStatusVersion < peerStatusVersion) {
-                System.out.println("New entry to peer " + m.getFrom() + "!");
-                peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
-            } else if (maxPeerStatusVersion.equals(peerStatusVersion)) {
-                System.out.println("This entry is duplicated to peer " + m.getFrom() + "!");
+        
+        synchronized (peersStatus) {
+            if (peersStatus.containsKey(peerStatus.getKey())) {
+                Long maxPeerStatusVersion = peersStatus.get(m.getFrom()).getY();
+                if (maxPeerStatusVersion < peerStatusVersion) {
+                    System.out.println("New entry to peer " + m.getFrom() + "!");
+                    peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
+                } else if (maxPeerStatusVersion.equals(peerStatusVersion)) {
+                    System.out.println("This entry is duplicated to peer " + m.getFrom() + "!");
+                } else {
+                    System.out.println("This entry is old to peer " + m.getFrom() + "!");
+                }
             } else {
-                System.out.println("This entry is old to peer " + m.getFrom() + "!");
+                System.out.println("First peer entry. Peer: " + m.getFrom() + ".");
+                peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
             }
-        } else {
-            System.out.println("First peer entry. Peer: " + m.getFrom() + ".");
-            peersStatus.put(peerStatus.getKey(), peerStatus.getValue());
         }
     }
 
