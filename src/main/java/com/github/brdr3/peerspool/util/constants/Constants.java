@@ -8,8 +8,8 @@ public class Constants {
     
     
     public static final User users[] = {new User(0, address[0], port[0]), 
-                                        new User(1, address[1], port[1]), 
-                                        new User(2, address[2], port[2]), 
-                                        new User(3, address[3], port[3]), 
-                                        new User(4, address[4], port[4])};
+                                        new User(1, address[1], port[1])};//, 
+//                                        new User(2, address[2], port[2]), 
+//                                        new User(3, address[3], port[3]), 
+//                                        new User(4, address[4], port[4])};
 }

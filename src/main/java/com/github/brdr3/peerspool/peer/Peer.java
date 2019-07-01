@@ -42,6 +42,7 @@ public class Peer {
         receiver = new Thread() {
             @Override
             public void run() {
+                System.out.println("receiver > Hi!");
                 receive();
             }
         };
@@ -49,20 +50,23 @@ public class Peer {
         sender = new Thread() {
             @Override
             public void run() {
-                send(false);
+                System.out.println("sender > Hi!");
+                send();
             }
         };
 
         dataGetter = new Thread() {
             @Override
             public void run() {
-                getDataStatus(true);
+                System.out.println("dataGetter > Hi!");
+                getDataStatus();
             }
         };
 
         gossiper = new Thread() {
             @Override
             public void run() {
+                System.out.println("gossiper > Hi!");
                 gossip();
             }
         };
@@ -70,6 +74,7 @@ public class Peer {
         processor = new Thread() {
             @Override
             public void run() {
+                System.out.println("processor > Hi!");
                 process();
             }
         };
@@ -77,6 +82,7 @@ public class Peer {
         confessor = new Thread() {
             @Override
             public void run() {
+                System.out.println("confessor > Hi!");
                 confess();
             }
         };
@@ -133,7 +139,6 @@ public class Peer {
                 }
 
                 processQueue.add(message);
-
                 Utils.cleanBuffer(buffer);
             }
         } catch (Exception ex) {
@@ -148,13 +153,16 @@ public class Peer {
     public void send(boolean silent) {
         while (true) {
             Message m = sendQueue.poll();
+            
             try {
                 if (m != null) {
                     sendMessage(m);
+                    
                     if (!silent) {
                         System.out.println("sender > Message sent to " + m.getTo());
                     }
                 }
+                
                 Thread.sleep(1000);
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -195,6 +203,7 @@ public class Peer {
                         System.out.println("dataGetter > New version of files.");
                         System.out.println("dataGetter > fileStatus = " + fileStatus);
                     }
+                    
                     version++;
                 }
             }
@@ -215,7 +224,7 @@ public class Peer {
 
         buffer = jsonMessage.getBytes();
         packet = new DatagramPacket(buffer, buffer.length, m.getTo().getAddress(),
-                m.getTo().getPort());
+                                    m.getTo().getPort());
 
         socket = new DatagramSocket();
         socket.send(packet);
@@ -246,17 +255,12 @@ public class Peer {
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
+                    
                     continue;
                 } else {
                     Object users[] = peersStatus.keySet().toArray();
                     gossiped = (User) users[r.nextInt(users.length)];
-                    // Functional Programming
-                    // Pick the map entry that has the user that I want to gossip.
-                    // In another words, pick what I want to gossip.
-                    gossip = (FileStatusEntry<User, Tuple<HashMap<String, File>, Long>>) peersStatus.entrySet()
-                            .stream()
-                            .filter(e -> e.getKey().equals(gossiped))
-                            .findFirst().get();
+                    gossip = new FileStatusEntry<>(gossiped, peersStatus.get(gossiped));
                 }
             }
 
@@ -289,9 +293,11 @@ public class Peer {
     public void process(boolean silent) {
         while (true) {
             Message m = processQueue.poll();
+            
             try {
                 if (m != null) {
                     processMessage(m, silent);
+                    
                     if (!silent) {
                         System.out.println("processor > Processing message " + m);
                     }
@@ -317,6 +323,7 @@ public class Peer {
                     if (!silent) {
                         System.out.println("processor > New entry to peer " + gossiped + "!");
                     }
+                    
                     peersStatus.put(gossiped, gossip);
                 } else if (maxPeerStatusVersion.equals(peerStatusVersion)) {
                     if (!silent) {
