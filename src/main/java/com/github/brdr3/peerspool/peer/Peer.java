@@ -3,6 +3,7 @@ package com.github.brdr3.peerspool.peer;
 import com.github.brdr3.peerspool.util.Message;
 import com.github.brdr3.peerspool.util.FileStatusEntry;
 import com.github.brdr3.peerspool.util.Message.MessageBuilder;
+import com.github.brdr3.peerspool.util.ObliviousMap;
 import com.github.brdr3.peerspool.util.Tuple;
 import com.github.brdr3.peerspool.util.User;
 import com.github.brdr3.peerspool.util.Utils;
@@ -36,7 +37,7 @@ public class Peer {
     private Long version = (long) 0;
 
     private volatile HashMap<String, File> fileStatus;
-    private volatile HashMap<User, Tuple<HashMap<String, File>, Long>> peersStatus;
+    private volatile ObliviousMap<User, Tuple<HashMap<String, File>, Long>> peersStatus;
 
     public Peer(int id, String address, int port, String path) {
         receiver = new Thread() {
@@ -101,7 +102,7 @@ public class Peer {
         this.sendQueue = new ConcurrentLinkedQueue<>();
         this.folder = new File(path);
         this.fileStatus = new HashMap<>();
-        this.peersStatus = new HashMap<>();
+        this.peersStatus = new ObliviousMap<>(new Long(10000));
     }
 
     public void start() {
@@ -163,7 +164,7 @@ public class Peer {
                     }
                 }
                 
-                Thread.sleep(1000);
+                Thread.sleep(5000);
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -209,7 +210,7 @@ public class Peer {
             }
 
             try {
-                Thread.sleep(1000);
+                Thread.sleep(5000);
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -251,7 +252,7 @@ public class Peer {
             synchronized (peersStatus) {
                 if (peersStatus.isEmpty()) {
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(5000);
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
@@ -279,7 +280,7 @@ public class Peer {
             sendQueue.add(m);
 
             try {
-                Thread.sleep(1000);
+                Thread.sleep(5000);
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -296,11 +297,11 @@ public class Peer {
             
             try {
                 if (m != null) {
-                    processMessage(m, silent);
-                    
                     if (!silent) {
                         System.out.println("processor > Processing message " + m);
                     }
+                    
+                    processMessage(m, silent);
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -377,7 +378,7 @@ public class Peer {
             sendQueue.add(m);
 
             try {
-                Thread.sleep(1000);
+                Thread.sleep(5000);
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
