@@ -23,6 +23,7 @@ public class ObliviousMap<K, V> implements Map {
         obliviator = new Thread() {
             @Override
             public void run() {
+                System.out.println("obliviator > Hi!");
                 obliviate(obliviateTime);
             }
         };
@@ -104,12 +105,17 @@ public class ObliviousMap<K, V> implements Map {
                     }).collect(Collectors.toSet());
     }
     
-    public void obliviate(Long obliviateTime) {
-        System.out.println("obliviator > Hi!");
+    public void obliviate (Long obliviateTime) {
+        obliviate(obliviateTime, false);
+    }
+    
+    public void obliviate(Long obliviateTime, boolean silent) {
         while(true) {
                 for(Entry<K, Tuple<V, Date>> e: base.entrySet()) {
                     if(e.getValue().getY().getTime() + obliviateTime <= new Date().getTime()) {
-                        System.out.println("obliviator > forgetting about " + e.getKey());
+                        if(!silent) {
+                            System.out.println("obliviator > forgetting about " + e.getKey());
+                        }
                         base.remove(e.getKey());
                     }
                 }
@@ -120,7 +126,7 @@ public class ObliviousMap<K, V> implements Map {
                 ex.printStackTrace();
             }
         }
-    };
+    }
 
     private class EntryImpl implements Entry<K, V> {
         private K key;

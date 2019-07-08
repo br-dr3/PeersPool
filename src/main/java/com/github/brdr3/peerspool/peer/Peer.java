@@ -18,7 +18,6 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Peer {
-
     private final Gson gson = new Gson();
 
     private final Thread receiver;
